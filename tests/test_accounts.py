@@ -15,7 +15,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # Import the single app.py module (not the app package)
 import importlib.util
-spec = importlib.util.spec_from_file_location("app_module", "../app.py")
+app_py_path = os.path.join(os.path.dirname(__file__), '..', 'app.py')
+spec = importlib.util.spec_from_file_location("app_module", app_py_path)
 app_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(app_module)
 
