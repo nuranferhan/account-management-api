@@ -1,0 +1,76 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: account-tests
+  namespace: account-management
+spec:
+  workspaces:
+  - name: source
+    description: The workspace containing the source code.
+  
+  steps:
+  - name: install-dependencies
+    image: python:3.9-slim
+    workingDir: $(workspaces.source.path)
+    script: |
+      #!/usr/bin/env bash
+      set -e
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install pytest-cov flake8 bandit
+  
+  - name: lint-code
+    image: python:3.9-slim
+    workingDir: $(workspaces.source.path)
+    script: |
+      #!/usr/bin/env bash
+      set -e
+      echo "Running flake8 linting..."
+      flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+  
+  - name: security-scan
+    image: python:3.9-slim
+    workingDir: $(workspaces.source.path)
+    script: |
+      #!/usr/bin/env bash
+      set -e
+      echo "Running security scan with bandit..."
+      bandit -r app/ -f json -o bandit-report.json || true
+      echo "Security scan completed"
+  
+  - name: run-tests
+    image: python:3.9-slim
+    workingDir: $(workspaces.source.path)
+    script: |
+      #!/usr/bin/env bash
+      set -e
+      echo "Running pytest with coverage..."
+      pytest --cov=app --cov-report=term-missing --cov-report=xml tests/
+      echo "Tests completed successfully"
+
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kubectl-deploy
+  namespace: account-management
+spec:
+  params:
+  - name: image
+    description: Image reference to deploy
+  workspaces:
+  - name: source
+  
+  steps:
+  - name: update-deployment
+    image: bitnami/kubectl:latest
+    workingDir: $(workspaces.source.path)
+    script: |
+      #!/bin/bash
+      set -e
+      echo "Applying Kubernetes manifests..."
+      kubectl apply -f k8s/namespace.yaml
+      kubectl apply -f k8s/deployment.yaml
+      kubectl apply -f k8s/service.yaml
+      echo "Deployment completed"

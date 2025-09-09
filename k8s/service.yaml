@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-management-service
+  namespace: account-management
+  labels:
+    app: account-management-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: account-management-api
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 5000
+    protocol: TCP
+    name: https

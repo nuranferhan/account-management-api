@@ -1,0 +1,72 @@
+name: CI Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      sqlite:
+        image: nouchka/sqlite3:latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-cov
+    
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Security scan with bandit
+      run: |
+        pip install bandit
+        bandit -r app/ -f json -o bandit-report.json || true
+    
+    - name: Test with pytest
+      run: |
+        pytest --cov=app --cov-report=xml --cov-report=term-missing tests/
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Build Docker image
+      run: |
+        docker build -t account-management-api:${{ github.sha }} .
+        docker build -t account-management-api:latest .
+    
+    - name: Test Docker image
+      run: |
+        docker run -d --name test-app -p 5000:5000 account-management-api:latest
+        sleep 10
+        curl -f http://localhost:5000/api/v1/health
+        docker stop test-app
+        docker rm test-app

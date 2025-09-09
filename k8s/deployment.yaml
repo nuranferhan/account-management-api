@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-management-api
+  namespace: account-management
+  labels:
+    app: account-management-api
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: account-management-api
+  template:
+    metadata:
+      labels:
+        app: account-management-api
+        version: v1
+    spec:
+      containers:
+      - name: account-api
+        image: account-management-api:latest
+        ports:
+        - containerPort: 5000
+          name: http
+        env:
+        - name: FLASK_ENV
+          value: "production"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: secret-key
+              optional: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      restartPolicy: Always

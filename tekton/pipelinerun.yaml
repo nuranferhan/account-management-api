@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: account-management-pipeline-run
+  namespace: account-management
+spec:
+  pipelineRef:
+    name: account-management-pipeline
+  
+  params:
+  - name: repo-url
+    value: https://github.com/yourusername/account-management-api
+  - name: image-reference
+    value: account-management-api:latest
+  
+  workspaces:
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
