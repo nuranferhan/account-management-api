@@ -1,28 +1,29 @@
 import pytest
 import json
+import sys
+import os
 
 # Fix for Werkzeug version issue in GitHub Actions
 import werkzeug
 if not hasattr(werkzeug, '__version__'):
     werkzeug.__version__ = '2.3.7'
 
-from app import create_app, db
-from app.models import Account
+# Add parent directory to path to import app
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Import from your single app.py file
+import app
 
 @pytest.fixture
-def app():
-    app = create_app()
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+def client():
+    app.app.config['TESTING'] = True
+    app.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.drop_all()
-
-@pytest.fixture
-def client(app):
-    return app.test_client()
+    with app.app.test_client() as client:
+        with app.app.app_context():
+            app.db.create_all()
+            yield client
+            app.db.drop_all()
 
 def test_health_check(client):
     response = client.get('/api/v1/health')
