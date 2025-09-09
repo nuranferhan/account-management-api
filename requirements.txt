@@ -1,6 +1,7 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
 Werkzeug==2.3.7
+gunicorn==21.2.0
 pytest==7.4.0
 pytest-cov==4.1.0
 pytest-flask==1.2.0
