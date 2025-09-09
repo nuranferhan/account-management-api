@@ -47,6 +47,7 @@ def health():
     try:
         # Test database connection
         db.session.execute('SELECT 1')
+        db.session.commit()  # Commit the transaction
         return jsonify({"status": "healthy", "service": "account-management-api", "database": "connected"})
     except Exception as e:
         return jsonify({"status": "unhealthy", "service": "account-management-api", "error": str(e)}), 500
@@ -108,7 +109,10 @@ def update_account(account_id):
 @app.route('/api/v1/accounts/<int:account_id>', methods=['DELETE'])
 def delete_account(account_id):
     try:
-        account = Account.query.get_or_404(account_id)
+        account = db.session.get(Account, account_id)
+        if not account:
+            return jsonify({'error': 'Account not found'}), 404
+            
         db.session.delete(account)
         db.session.commit()
         

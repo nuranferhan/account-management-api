@@ -36,6 +36,9 @@ def test_health_check(client):
     assert response.status_code == 200
     data = json.loads(response.data)
     assert data['status'] == 'healthy'
+    assert data['service'] == 'account-management-api'
+    # Database connection should also be tested
+    assert 'database' in data
 
 def test_create_account(client):
     account_data = {
@@ -43,7 +46,7 @@ def test_create_account(client):
         'email': 'john@example.com',
         'phone': '123-456-7890'
     }
-    response = client.post('/api/v1/accounts', 
+    response = client.post('/api/v1/accounts',
                           json=account_data,
                           content_type='application/json')
     assert response.status_code == 201
