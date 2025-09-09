@@ -2,7 +2,9 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 import os
+import re
 from datetime import datetime
+from werkzeug.exceptions import BadRequest
 
 app = Flask(__name__)
 
@@ -14,6 +16,42 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize extensions
 db = SQLAlchemy(app)
 CORS(app)
+
+# Security headers for all responses
+@app.after_request
+def after_request(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY' 
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+    return response
+
+# Input validation functions
+def validate_email(email):
+    """Validate email format"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
+
+def sanitize_input(data):
+    """Sanitize input data to prevent XSS"""
+    if isinstance(data, str):
+        data = data.replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+    return data
+
+def validate_account_data(data):
+    """Validate account data"""
+    if not data:
+        raise BadRequest("No data provided")
+    
+    if 'email' in data and not validate_email(data['email']):
+        raise BadRequest("Invalid email format")
+    
+    if 'name' in data and len(data['name'].strip()) < 2:
+        raise BadRequest("Name must be at least 2 characters long")
+    
+    return True
 
 # Models 
 class Account(db.Model):
@@ -35,7 +73,21 @@ class Account(db.Model):
     def from_dict(self, data):
         for field in ['name', 'email', 'phone']:
             if field in data:
-                setattr(self, field, data[field])
+                # Sanitize input data
+                value = sanitize_input(data[field]) if isinstance(data[field], str) else data[field]
+                setattr(self, field, value)
+
+# Error handlers
+@app.errorhandler(BadRequest)
+def handle_bad_request(error):
+    """Handle validation errors"""
+    return jsonify({'error': str(error.description)}), 400
+
+@app.errorhandler(Exception)
+def handle_error(error):
+    """Handle unexpected errors"""
+    app.logger.error(f"Unexpected error: {str(error)}")
+    return jsonify({'error': 'Internal server error'}), 500
 
 # Routes
 @app.route('/')
@@ -55,6 +107,10 @@ def health():
 def create_account():
     try:
         data = request.get_json()
+        
+        # Security validation
+        validate_account_data(data)
+        
         if not data or 'name' not in data or 'email' not in data:
             return jsonify({'error': 'Name and email are required'}), 400
         
@@ -69,6 +125,8 @@ def create_account():
         db.session.commit()
         
         return jsonify(account.to_dict()), 201
+    except BadRequest:
+        raise  # Re-raise validation errors
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
@@ -101,13 +159,16 @@ def update_account(account_id):
             return jsonify({'error': 'Account not found'}), 404
             
         data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
+        
+        # Security validation
+        validate_account_data(data)
         
         account.from_dict(data)
         db.session.commit()
         
         return jsonify(account.to_dict()), 200
+    except BadRequest:
+        raise  # Re-raise validation errors
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
