@@ -4,31 +4,16 @@ from flask_cors import CORS
 import os
 from datetime import datetime
 
-def create_app():
-    app = Flask(__name__)
-    
-    # Configuration
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-2024')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///accounts.db')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['DEBUG'] = os.getenv('DEBUG', 'False').lower() == 'true'
-    
-    # Initialize extensions
-    db.init_app(app)
-    CORS(app)
-    
-    # Register routes
-    register_routes(app, db)
-    
-    # Create tables
-    with app.app_context():
-        db.create_all()
-        print("Database tables created!")
-    
-    return app
+app = Flask(__name__)
 
-# Initialize SQLAlchemy
-db = SQLAlchemy()
+# Configuration - basit ve güvenli
+app.config['SECRET_KEY'] = 'dev-secret-key-2024'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///accounts.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize extensions
+db = SQLAlchemy(app)
+CORS(app)
 
 # Models 
 class Account(db.Model):
@@ -52,89 +37,113 @@ class Account(db.Model):
             if field in data:
                 setattr(self, field, data[field])
 
-def register_routes(app, db):
-    @app.route('/')
-    def home():
-        return jsonify({"message": "Account Management API is running!", "status": "ok"})
+# Routes
+@app.route('/')
+def home():
+    return jsonify({"message": "Account Management API is running!", "status": "ok"})
 
-    @app.route('/api/v1/health')
-    def health():
-        return jsonify({"status": "healthy", "service": "account-management-api"})
+@app.route('/api/v1/health')
+def health():
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        return jsonify({"status": "healthy", "service": "account-management-api", "database": "connected"})
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "service": "account-management-api", "error": str(e)}), 500
 
-    @app.route('/api/v1/accounts', methods=['POST'])
-    def create_account():
-        try:
-            data = request.get_json()
-            if not data or 'name' not in data or 'email' not in data:
-                return jsonify({'error': 'Name and email are required'}), 400
-            
-            # Check if email already exists
-            existing = Account.query.filter_by(email=data['email']).first()
-            if existing:
-                return jsonify({'error': 'Email already exists'}), 409
-            
-            account = Account()
-            account.from_dict(data)
-            db.session.add(account)
-            db.session.commit()
-            
-            return jsonify(account.to_dict()), 201
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+@app.route('/api/v1/accounts', methods=['POST'])
+def create_account():
+    try:
+        data = request.get_json()
+        if not data or 'name' not in data or 'email' not in data:
+            return jsonify({'error': 'Name and email are required'}), 400
+        
+        # Check if email already exists
+        existing = Account.query.filter_by(email=data['email']).first()
+        if existing:
+            return jsonify({'error': 'Email already exists'}), 409
+        
+        account = Account()
+        account.from_dict(data)
+        db.session.add(account)
+        db.session.commit()
+        
+        return jsonify(account.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/v1/accounts/<int:account_id>', methods=['GET'])
-    def get_account(account_id):
-        try:
-            account = Account.query.get(account_id)
-            if not account:
-                return jsonify({'error': 'Account not found'}), 404
-            return jsonify(account.to_dict()), 200
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+@app.route('/api/v1/accounts/<int:account_id>', methods=['GET'])
+def get_account(account_id):
+    try:
+        account = Account.query.get_or_404(account_id)
+        return jsonify(account.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/v1/accounts', methods=['GET'])
-    def list_accounts():
-        try:
-            accounts = Account.query.all()
-            return jsonify([account.to_dict() for account in accounts]), 200
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+@app.route('/api/v1/accounts', methods=['GET'])
+def list_accounts():
+    try:
+        accounts = Account.query.all()
+        return jsonify([account.to_dict() for account in accounts]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/v1/accounts/<int:account_id>', methods=['PUT'])
-    def update_account(account_id):
-        try:
-            account = Account.query.get(account_id)
-            if not account:
-                return jsonify({'error': 'Account not found'}), 404
-            
-            data = request.get_json()
-            if not data:
-                return jsonify({'error': 'No data provided'}), 400
-            
-            account.from_dict(data)
-            db.session.commit()
-            
-            return jsonify(account.to_dict()), 200
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+@app.route('/api/v1/accounts/<int:account_id>', methods=['PUT'])
+def update_account(account_id):
+    try:
+        account = Account.query.get_or_404(account_id)
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        account.from_dict(data)
+        db.session.commit()
+        
+        return jsonify(account.to_dict()), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
-    @app.route('/api/v1/accounts/<int:account_id>', methods=['DELETE'])
-    def delete_account(account_id):
-        try:
-            account = Account.query.get(account_id)
-            if not account:
-                return jsonify({'error': 'Account not found'}), 404
-            
-            db.session.delete(account)
-            db.session.commit()
-            
-            return jsonify({'message': 'Account deleted successfully'}), 200
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+@app.route('/api/v1/accounts/<int:account_id>', methods=['DELETE'])
+def delete_account(account_id):
+    try:
+        account = Account.query.get_or_404(account_id)
+        db.session.delete(account)
+        db.session.commit()
+        
+        return jsonify({'message': 'Account deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
-# Create app instance
-app = create_app()
+# Initialize database
+def init_db():
+    try:
+        with app.app_context():
+            db.create_all()
+            print("✓ Database tables created successfully!")
+            return True
+    except Exception as e:
+        print(f"✗ Database initialization failed: {e}")
+        return False
 
+# Application startup
 if __name__ == '__main__':
-    print("Starting Account Management API in development mode...")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("Starting Account Management API...")
+    if init_db():
+        print("Starting server on 0.0.0.0:5000...")
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    else:
+        print("Failed to initialize database, exiting...")
+        exit(1)
+
+# For gunicorn
+def create_app():
+    print("Creating app for gunicorn...")
+    if init_db():
+        print("✓ App created successfully for gunicorn")
+        return app
+    else:
+        print("✗ Failed to create app for gunicorn")
+        raise Exception("Database initialization failed")

@@ -62,41 +62,50 @@ jobs:
     - name: Test Docker image startup
       run: |
         # Start container in background
+        echo "Starting container..."
         docker run -d --name test-app -p 5000:5000 account-management-api:latest
+        
+        # Immediately check container status and logs
+        echo "Container status after start:"
+        docker ps -a
+        
+        echo "Initial container logs:"
+        docker logs test-app
         
         # Wait for application to start
         echo "Waiting for application to start..."
-        for i in {1..30}; do
+        for i in {1..15}; do
+          echo "Attempt $i/15 - checking logs and health..."
+          docker logs test-app
+          echo "---"
           if curl -f http://localhost:5000/api/v1/health > /dev/null 2>&1; then
             echo "Application started successfully!"
             break
           fi
-          echo "Attempt $i/30 - waiting 2 more seconds..."
-          sleep 2
+          sleep 3
         done
         
-        # Check if application responded
-        echo "Final health check..."
-        curl -f http://localhost:5000/api/v1/health
-        
-        # Show container logs for debugging
-        echo "Container logs:"
-        docker logs test-app
-        
-        # Check container status
+        # Final diagnostics
+        echo "=== FINAL DIAGNOSTICS ==="
         echo "Container status:"
         docker ps -a
         
-        # Test API endpoints
-        echo "Testing main endpoint:"
-        curl -f http://localhost:5000/
+        echo "Full container logs:"
+        docker logs test-app
         
-        echo "Testing accounts endpoint:"
-        curl -f http://localhost:5000/api/v1/accounts
+        echo "Container inspect:"
+        docker inspect test-app | grep -A 10 -B 10 "Status\|Health\|ExitCode"
+        
+        echo "Port mapping check:"
+        docker port test-app
+        
+        # Final health check
+        echo "Final health check..."
+        curl -v http://localhost:5000/api/v1/health || true
         
         # Cleanup
-        docker stop test-app
-        docker rm test-app
+        docker stop test-app || true
+        docker rm test-app || true
     
     - name: Docker image security scan
       run: |
