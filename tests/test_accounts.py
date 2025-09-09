@@ -1,5 +1,11 @@
 import pytest
 import json
+
+# Fix for Werkzeug version issue in GitHub Actions
+import werkzeug
+if not hasattr(werkzeug, '__version__'):
+    werkzeug.__version__ = '2.3.7'
+
 from app import create_app, db
 from app.models import Account
 

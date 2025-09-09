@@ -1,4 +1,3 @@
-# app.py - TAMAMEN YENİ VERSİYON
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -16,7 +15,7 @@ app.config['DEBUG'] = True
 db = SQLAlchemy(app)
 CORS(app)
 
-# Models (direkt burada tanımlayalım)
+# Models 
 from datetime import datetime
 
 class Account(db.Model):
@@ -40,7 +39,7 @@ class Account(db.Model):
             if field in data:
                 setattr(self, field, data[field])
 
-# Routes (direkt burada tanımlayalım)
+# Routes
 from flask import request, jsonify
 
 @app.route('/')
