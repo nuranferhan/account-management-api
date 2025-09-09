@@ -37,34 +37,6 @@ account-management-api/
 
 ````
 
-## Local Development
-
-### Prerequisites
-- Python 3.9+
-- pip
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/YOUR_USERNAME/account-management-api.git
-cd account-management-api
-````
-
-2. Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Run the application:
-
-```bash
-python app.py
-```
-
-The API will be available at `http://localhost:5000`
-
 ## Testing
 
 Run tests with coverage:
