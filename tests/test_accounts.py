@@ -8,22 +8,27 @@ import werkzeug
 if not hasattr(werkzeug, '__version__'):
     werkzeug.__version__ = '2.3.7'
 
-# Add parent directory to path to import app
+# Import from your single app.py file directly
+import sys
+import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Import from your single app.py file
-from app import app, db
+# Import the single app.py module (not the app package)
+import importlib.util
+spec = importlib.util.spec_from_file_location("app_module", "../app.py")
+app_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(app_module)
 
 @pytest.fixture
 def client():
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app_module.app.config['TESTING'] = True
+    app_module.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     
-    with app.test_client() as client:
-        with app.app_context():
-            db.create_all()
+    with app_module.app.test_client() as client:
+        with app_module.app.app_context():
+            app_module.db.create_all()
             yield client
-            db.drop_all()
+            app_module.db.drop_all()
 
 def test_health_check(client):
     response = client.get('/api/v1/health')
