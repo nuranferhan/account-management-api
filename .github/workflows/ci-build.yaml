@@ -39,7 +39,8 @@ jobs:
     
     - name: Test with pytest
       run: |
-        pytest --cov=app --cov-report=xml --cov-report=term-missing tests/ || pytest --cov-report=xml --cov-report=term-missing tests/
+        # Test with coverage for the main app.py file
+        pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-config=.coveragerc tests/ -v
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
