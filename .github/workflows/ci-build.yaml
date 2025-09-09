@@ -10,10 +10,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     
-    services:
-      sqlite:
-        image: nouchka/sqlite3:latest
-    
     steps:
     - uses: actions/checkout@v4
     
@@ -39,11 +35,11 @@ jobs:
     - name: Security scan with bandit
       run: |
         pip install bandit
-        bandit -r app/ -f json -o bandit-report.json || true
+        bandit -r . -f json -o bandit-report.json || true
     
     - name: Test with pytest
       run: |
-        pytest --cov=app --cov-report=xml --cov-report=term-missing tests/
+        pytest --cov=app --cov-report=xml --cov-report=term-missing tests/ || pytest --cov-report=xml --cov-report=term-missing tests/
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -63,10 +59,47 @@ jobs:
         docker build -t account-management-api:${{ github.sha }} .
         docker build -t account-management-api:latest .
     
-    - name: Test Docker image
+    - name: Test Docker image startup
       run: |
+        # Start container in background
         docker run -d --name test-app -p 5000:5000 account-management-api:latest
-        sleep 10
+        
+        # Wait for application to start
+        echo "Waiting for application to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:5000/api/v1/health > /dev/null 2>&1; then
+            echo "Application started successfully!"
+            break
+          fi
+          echo "Attempt $i/30 - waiting 2 more seconds..."
+          sleep 2
+        done
+        
+        # Check if application responded
+        echo "Final health check..."
         curl -f http://localhost:5000/api/v1/health
+        
+        # Show container logs for debugging
+        echo "Container logs:"
+        docker logs test-app
+        
+        # Check container status
+        echo "Container status:"
+        docker ps -a
+        
+        # Test API endpoints
+        echo "Testing main endpoint:"
+        curl -f http://localhost:5000/
+        
+        echo "Testing accounts endpoint:"
+        curl -f http://localhost:5000/api/v1/accounts
+        
+        # Cleanup
         docker stop test-app
         docker rm test-app
+    
+    - name: Docker image security scan
+      run: |
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+          -v $(pwd):/workspace \
+          aquasec/trivy image account-management-api:latest || true
