@@ -45,9 +45,8 @@ def home():
 @app.route('/api/v1/health')
 def health():
     try:
-        # Test database connection
-        db.session.execute('SELECT 1')
-        db.session.commit()  # Commit the transaction
+        # Test database connection - SQLAlchemy 2.0 compatible
+        db.session.execute(db.text('SELECT 1'))
         return jsonify({"status": "healthy", "service": "account-management-api", "database": "connected"})
     except Exception as e:
         return jsonify({"status": "unhealthy", "service": "account-management-api", "error": str(e)}), 500
@@ -77,7 +76,10 @@ def create_account():
 @app.route('/api/v1/accounts/<int:account_id>', methods=['GET'])
 def get_account(account_id):
     try:
-        account = Account.query.get_or_404(account_id)
+        # SQLAlchemy 2.0 compatible
+        account = db.session.get(Account, account_id)
+        if not account:
+            return jsonify({'error': 'Account not found'}), 404
         return jsonify(account.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -93,7 +95,11 @@ def list_accounts():
 @app.route('/api/v1/accounts/<int:account_id>', methods=['PUT'])
 def update_account(account_id):
     try:
-        account = Account.query.get_or_404(account_id)
+        # SQLAlchemy 2.0 compatible
+        account = db.session.get(Account, account_id)
+        if not account:
+            return jsonify({'error': 'Account not found'}), 404
+            
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No data provided'}), 400
