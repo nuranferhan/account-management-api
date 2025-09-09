@@ -1,7 +1,6 @@
 # Account Management API
 
 ![CI Build and Test](https://github.com/nuranferhan/account-management-api/workflows/CI%20Build%20and%20Test/badge.svg)
-[![codecov](https://codecov.io/gh/nuranferhan/account-management-api/branch/main/graph/badge.svg)](https://codecov.io/gh/nuranferhan/account-management-api)
 
 A RESTful API for managing user accounts built with Flask and SQLAlchemy.
 
