@@ -8,17 +8,18 @@ import werkzeug
 if not hasattr(werkzeug, '__version__'):
     werkzeug.__version__ = '2.3.7'
 
-# Import from your single app.py file directly
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Change working directory to parent to find app.py
+original_cwd = os.getcwd()
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+os.chdir(parent_dir)
+sys.path.insert(0, parent_dir)
 
-# Import the single app.py module (not the app package)
-import importlib.util
-app_py_path = os.path.join(os.path.dirname(__file__), '..', 'app.py')
-spec = importlib.util.spec_from_file_location("app_module", app_py_path)
-app_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(app_module)
+try:
+    # Now import app.py directly
+    import app as app_module
+finally:
+    # Restore original working directory
+    os.chdir(original_cwd)
 
 @pytest.fixture
 def client():
