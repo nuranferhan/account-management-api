@@ -12,18 +12,18 @@ if not hasattr(werkzeug, '__version__'):
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import from your single app.py file
-import app
+from app import app, db
 
 @pytest.fixture
 def client():
-    app.app.config['TESTING'] = True
-    app.app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    app.config['TESTING'] = True
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
     
-    with app.app.test_client() as client:
-        with app.app.app_context():
-            app.db.create_all()
+    with app.test_client() as client:
+        with app.app_context():
+            db.create_all()
             yield client
-            app.db.drop_all()
+            db.drop_all()
 
 def test_health_check(client):
     response = client.get('/api/v1/health')
